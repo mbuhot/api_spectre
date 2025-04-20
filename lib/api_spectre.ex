@@ -22,15 +22,18 @@ defmodule ApiSpectre do
         end
       end)
       |> Map.new()
+      |> dbg()
 
-    put_in(api.paths, Map.merge(api.paths, paths))
+    put_in(api.paths, Map.merge(api.paths || %{}, paths))
   end
 
   @spec add_schemas(ApiSpectre.OpenApi.t(), map()) :: ApiSpectre.OpenApi.t()
   def add_schemas(%ApiSpectre.OpenApi{} = api, extra_schemas) do
-    schemas = get_in(api.components.schemas) || %{}
+    components = api.components || %ApiSpectre.OpenApi.Components{}
+    schemas = components.schemas || %{}
     schemas = Map.merge(schemas, extra_schemas)
-    put_in(api.components.schemas, schemas)
+    components = %{components | schemas: schemas}
+    %{api | components: components}
   end
 
   def make_path_item(route_group) do
