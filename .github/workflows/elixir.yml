@@ -1,0 +1,63 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint (OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: ["27"]
+        elixir: ["1.18"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        id: beam
+        with:
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
+      - name: PLT cache
+        uses: actions/cache@v4
+        with:
+          key: |
+            ${{ runner.os }}-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-plt
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-plt
+          path: |
+            priv/plts
+      - run: mix deps.get
+      - run: mix compile --warnings-as-errors
+      - run: mix format --check-formatted
+      - run: mix credo --strict --all
+      - run: mix dialyzer --format github
+
+  test:
+    runs-on: ubuntu-20.04
+    name: Test (OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}})
+    strategy:
+      matrix:
+        otp: ["27"]
+        elixir: ["1.18"]
+        # Test each elixir version with lowest and highest compatible OTP version, exclude others
+        # See https://hexdocs.pm/elixir/compatibility-and-deprecations.html#between-elixir-and-erlang-otp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.otp}}
+          elixir-version: ${{matrix.elixir}}
+      - uses: actions/cache@v4
+        with:
+          key: |
+            ${{ runner.os }}-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-build
+          restore-keys: |
+            ${{ runner.os }}-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-build
+          path: |
+            _build
+      - run: mix deps.get
+      - run: mix test
